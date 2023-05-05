@@ -1,8 +1,7 @@
 const Hapi = require('@hapi/hapi');
 const Joi = require('@hapi/joi');
-const { MongoClient, ObjectId } = require('mongodb');
-// const mongoose = require('mongoose');
-const Todo = require('./modals/')
+const mongoose = require('mongoose');
+const todoModel = require('./modals/todoSchema')
 const Boom = require('@hapi/boom');
 
 const server = Hapi.server({
@@ -10,15 +9,10 @@ const server = Hapi.server({
   host: 'localhost'
 });
 
-// const uri = 'mongodb://localhost:27017';
-const client = new MongoClient(uri, { useUnifiedTopology: true });
-
-async function connect() {
-  await client.connect();
-  console.log('Connected to MongoDB database');
-}
-
-connect();
+mongoose.connect('mongodb://localhost:27017/learn-hapi', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
 
 server.route({
   method: 'GET',
@@ -33,9 +27,7 @@ server.route({
   path: '/todos',
   handler: async (request, h) => {
     try {
-      const db = client.db('learn-hapi');
-      const collection = db.collection('todos');
-      const todos = await collection.find({}).toArray();
+      const todos = await todoModel.find({});
       return todos;
     } catch (error) {
       throw Boom.internal(error.message);
@@ -50,17 +42,16 @@ server.route({
     validate: {
       payload: Joi.object({
         title: Joi.string().required(),
-        completed: Joi.boolean().required()
+        description: Joi.string().required(),
+        status: Joi.string().valid('pending', 'in progress', 'completed').default('pending').optional(),
+        dueDate: Joi.date().required()
       })
     }
   },
   handler: async (request, h) => {
     try {
-      const db = client.db('learn-hapi');
-      const collection = db.collection('todos');
-      const todo = request.payload;
-      const result = await collection.insertOne(todo);
-      console.log(result);
+      const todo = new todoModel(request.payload);
+      const result = await todo.save();
       return result;
     } catch (error) {
       console.log(error);
@@ -68,7 +59,6 @@ server.route({
     }
   }
 });
-
 
 server.route({
   method: 'PUT',
@@ -80,25 +70,20 @@ server.route({
       }),
       payload: Joi.object({
         title: Joi.string().required(),
-        completed: Joi.boolean().required()
+        description: Joi.string().required(),
+        status: Joi.string().valid('pending', 'in progress', 'completed').optional(),
+        dueDate: Joi.date().required()
       })
     }
   },
   handler: async (request, h) => {
     try {
-      const db = client.db('learn-hapi');
-      const collection = db.collection('todos');
       const id = request.params.id;
-      const todo = request.payload;
-      const result = await collection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: todo }
-      );
-      console.log(result);
-      if (result.modifiedCount === 0) {
+      const todo = await todoModel.findByIdAndUpdate(id, request.payload, { new: true });
+      if (!todo) {
         throw Boom.notFound(`Todo item with id ${id} not found`);
       }
-      return result.modifiedCount;
+      return todo;
     } catch (error) {
       console.log(error);
       throw Boom.internal(error.message);
@@ -118,15 +103,12 @@ server.route({
   },
   handler: async (request, h) => {
     try {
-      const db = client.db('learn-hapi');
-      const collection = db.collection('todos');
       const id = request.params.id;
-      const result = await collection.deleteOne({ _id: new ObjectId(id) });
-      console.log(result);
-      if (result.deletedCount === 0) {
+      const result = await todoModel.findByIdAndDelete(id);
+      if (!result) {
         throw Boom.notFound(`Todo item with id ${id} not found`);
       }
-      return result.deletedCount;
+      return result;
     } catch (error) {
       console.log(error);
       throw Boom.internal(error.message);
@@ -146,8 +128,15 @@ server.ext('onPreResponse', (request, h) => {
 });
 
 async function start() {
-  await server.start();
-  console.log(`Server running on ${server.info.uri}`);
+  try {
+    await mongoose.connect('mongodb://localhost:27017/learn-hapi', { useNewUrlParser: true, useUnifiedTopology: true });
+    console.log('Connected to MongoDB database');
+    await server.start();
+    console.log(`Server running on ${server.info.uri}`);
+  } catch (error) {
+    console.log(error);
+    process.exit(1);
+  }
 }
 
 start();
