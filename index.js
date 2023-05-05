@@ -1,13 +1,16 @@
 const Hapi = require('@hapi/hapi');
 const Joi = require('@hapi/joi');
 const { MongoClient, ObjectId } = require('mongodb');
+// const mongoose = require('mongoose');
+const Todo = require('./modals/')
+const Boom = require('@hapi/boom');
 
 const server = Hapi.server({
   port: 3000,
   host: 'localhost'
 });
 
-const uri = 'mongodb://localhost:27017';
+// const uri = 'mongodb://localhost:27017';
 const client = new MongoClient(uri, { useUnifiedTopology: true });
 
 async function connect() {
@@ -29,10 +32,14 @@ server.route({
   method: 'GET',
   path: '/todos',
   handler: async (request, h) => {
-    const db = client.db('lean-hapi');
-    const collection = db.collection('todos');
-    const todos = await collection.find({}).toArray();
-    return todos;
+    try {
+      const db = client.db('learn-hapi');
+      const collection = db.collection('todos');
+      const todos = await collection.find({}).toArray();
+      return todos;
+    } catch (error) {
+      throw Boom.internal(error.message);
+    }
   }
 });
 
@@ -48,13 +55,20 @@ server.route({
     }
   },
   handler: async (request, h) => {
-    const db = client.db('learn-hapi');
-    const collection = db.collection('todos');
-    const todo = request.payload;
-    const result = await collection.insertOne(todo);
-    return result.ops[0];
+    try {
+      const db = client.db('learn-hapi');
+      const collection = db.collection('todos');
+      const todo = request.payload;
+      const result = await collection.insertOne(todo);
+      console.log(result);
+      return result;
+    } catch (error) {
+      console.log(error);
+      throw Boom.internal(error.message);
+    }
   }
 });
+
 
 server.route({
   method: 'PUT',
@@ -71,18 +85,24 @@ server.route({
     }
   },
   handler: async (request, h) => {
-    const db = client.db('learn-hapi');
-    const collection = db.collection('todos');
-    const id = request.params.id;
-    const todo = request.payload;
-    const result = await collection.updateOne(
-      { _id: ObjectId(id) },
-      { $set: todo }
-    );
-    if (result.modifiedCount === 0) {
-      throw new Error(`Todo item with id ${id} not found`);
+    try {
+      const db = client.db('learn-hapi');
+      const collection = db.collection('todos');
+      const id = request.params.id;
+      const todo = request.payload;
+      const result = await collection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: todo }
+      );
+      console.log(result);
+      if (result.modifiedCount === 0) {
+        throw Boom.notFound(`Todo item with id ${id} not found`);
+      }
+      return result.modifiedCount;
+    } catch (error) {
+      console.log(error);
+      throw Boom.internal(error.message);
     }
-    return result.modifiedCount;
   }
 });
 
@@ -97,14 +117,20 @@ server.route({
     }
   },
   handler: async (request, h) => {
-    const db = client.db('learn-hapi');
-    const collection = db.collection('todos');
-    const id = request.params.id;
-    const result = await collection.deleteOne({ _id: ObjectId(id) });
-    if (result.deletedCount === 0) {
-      throw new Error(`Todo item with id ${id} not found`);
+    try {
+      const db = client.db('learn-hapi');
+      const collection = db.collection('todos');
+      const id = request.params.id;
+      const result = await collection.deleteOne({ _id: new ObjectId(id) });
+      console.log(result);
+      if (result.deletedCount === 0) {
+        throw Boom.notFound(`Todo item with id ${id} not found`);
+      }
+      return result.deletedCount;
+    } catch (error) {
+      console.log(error);
+      throw Boom.internal(error.message);
     }
-    return result.deletedCount;
   }
 });
 
@@ -125,3 +151,4 @@ async function start() {
 }
 
 start();
+
