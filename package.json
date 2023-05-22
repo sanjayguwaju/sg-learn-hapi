@@ -13,8 +13,10 @@
   "dependencies": {
     "@hapi/hapi": "^21.3.2",
     "@hapi/joi": "^17.1.1",
+    "hapi-mongodb": "^10.0.3",
     "mongodb": "^5.3.0",
-    "mongoose": "^7.1.0"
+    "mongoose": "^7.1.0",
+    "pino": "^8.14.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
